@@ -3,9 +3,13 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "homepage": "https://younghoonam.github.io/threejs-study/",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "vite"
+    "dev": "vite",
+    "predeploy" : "npm run build",
+    "deploy" : "gh-pages -d dist",
+    "build": "vite build"
   },
   "keywords": [],
   "author": "",
@@ -13,5 +17,8 @@
   "dependencies": {
     "three": "^0.167.1",
     "vite": "^5.4.2"
+  },
+  "devDependencies": {
+    "gh-pages": "^6.1.1"
   }
 }
