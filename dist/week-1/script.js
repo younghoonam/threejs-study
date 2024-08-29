@@ -4,7 +4,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 let model;
 
 // Selecting HTML <canvas> element for canvas of renderer
-const canvas = document.querySelector("#week-1-canvas");
+const canvas = document.querySelector("#canvas");
 
 // Scene
 const scene = new THREE.Scene();

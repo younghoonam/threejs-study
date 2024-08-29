@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 // Selecting HTML <canvas> element for canvas of renderer
-const canvas = document.querySelector("#week-3-canvas");
+const canvas = document.querySelector("#canvas");
 
 // Clock
 const clock = new THREE.Clock();
