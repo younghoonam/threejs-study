@@ -19,13 +19,17 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   1000
 );
-camera.position.z = 5;
-camera.position.y = -6;
-camera.lookAt(0, 0, 0);
+
+// Orbit Controls
+const orbitControls = new OrbitControls(camera, canvas);
+camera.position.set(3.5, -5.5, 3);
+camera.lookAt(2, -4, -1);
+orbitControls.update();
 
 // Ambient Light for a simple even lighting
 const ambientLight = new THREE.AmbientLight("white", 1);
 scene.add(ambientLight);
+// Directional light
 const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
 directionalLight.position.set(-0.5, -0.3, 1);
 scene.add(directionalLight);
@@ -85,13 +89,11 @@ boxArray.forEach((child) => {
 // Renderer
 // passing <canvas> to canvas attribute
 const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+renderer.setClearColor(0xf5f5f7);
 // setting renderer size to the size of <canvas> element
 renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
 // main animation loop function to renderer
 renderer.setAnimationLoop(animate);
-
-// Orbit Controls
-const controls = new OrbitControls(camera, renderer.domElement);
 
 ////////////////////
 // Animation Loop //
@@ -108,7 +110,7 @@ function animate() {
   // lerp and update box heights
   updateBoxHeights();
 
-  controls.update();
+  orbitControls.update();
   renderer.render(scene, camera);
 }
 
@@ -127,28 +129,36 @@ function randomizeTargetHeights() {
 }
 
 function updateBoxHeights() {
+  // 2 nested loops
+  // Box Loop
   for (let boxIndex = 0; boxIndex < boxArray.length; boxIndex++) {
+    // Vertex Loop
     for (
       let vertexIndex = 0;
       vertexIndex < topVertexIndices.length;
       vertexIndex++
     ) {
+      // Create temporary vector
       const tempVector3 = new THREE.Vector3();
+      // store current vertex position to vector
       tempVector3.fromArray(
         boxArray[boxIndex].geometry.attributes.position.array,
         topVertexIndices[vertexIndex]
       );
+      // lerp current position to target position
       const lerpedZPosition = THREE.MathUtils.lerp(
         tempVector3.z,
         targetHeights[boxIndex],
         0.025
       );
       tempVector3.z = lerpedZPosition;
+      // update vertex with vector
       tempVector3.toArray(
         boxArray[boxIndex].geometry.attributes.position.array,
         topVertexIndices[vertexIndex]
       );
     }
+    // flag update
     boxArray[boxIndex].geometry.attributes.position.needsUpdate = true;
   }
 }

@@ -8,13 +8,26 @@
   </head>
   <body>
     <div class="wrapper">
-      <h1 class="week-title-1">Week 1 - Hello World</h1>
+      <h1 class="main-title">THREE.JS STUDY</h1>
+      <ul>
+        <li><a href="#week-1">Week 1 - Hello World</a></li>
+        <li><a href="#week-2">Week 2 - Cameras, Lights</a></li>
+        <li><a href="#week-3">Week 3 - BufferGeometry</a></li>
+        <br />
+        <li>
+          <a href="toy-project-1/toy-project-01.html">Week 4 - Toy Project 1</a>
+        </li>
+        <li>
+          <a href="toy-project-2/toy-project-2.html">Week ? - Toy Project 2</a>
+        </li>
+      </ul>
+      <h1 class="week-title-1" id="week-1">Week 1 - Hello World</h1>
       <h2 class="week-title-2">rotating hello world text</h2>
 
       <canvas id="week-1-canvas" class="three-frame"></canvas>
       <script type="module" src="week-1/script.js"></script>
 
-      <h1 class="week-title-1">Week 2 - Cameras, Lights</h1>
+      <h1 class="week-title-1" id="week-2">Week 2 - Cameras, Lights</h1>
       <h2 class="week-title-2">
         abstract graphical background using multiple lights
       </h2>
@@ -29,12 +42,25 @@
         <li>Try making facade geometry with code</li>
       </ul>
 
-      <h1 class="week-title-1">Week 3 - BufferGeometry</h1>
+      <h1 class="week-title-1" id="week-3">Week 3 - BufferGeometry</h1>
       <h2 class="week-title-2">
         box height noise with changing BufferGeometry attributes
       </h2>
       <canvas id="week-3-canvas" class="three-frame"></canvas>
       <script type="module" src="week-3/script.js"></script>
+      <p>
+        각기 다른 개체의 육면체 배열을 만들고, BufferGeometry의 BufferAttributes
+        값을 시간에 따라 랜덤하게 변경하여 육면체의 높이를 다이나믹하게
+        변화시켰다. 높이의 타겟 값은 매초마다 변경되며, BufferAttributes 값을 매
+        프레임마다 타겟 값으로 Linear Interpolation(Lerp)를 통해 부드러운 변화를
+        할 수 있다.
+      </p>
+      <h3>To Do</h3>
+      <ul>
+        <li>Add dynamic lights</li>
+        <li>Dynamically change box color</li>
+        <li>Mouse position based camera movement</li>
+      </ul>
     </div>
   </body>
 </html>

@@ -11,9 +11,15 @@ body {
   margin-inline: auto;
   padding-inline: 1rem;
 }
+
+.main-title {
+  font-size: 3rem;
+  font-weight: 900;
+}
+
 .week-title-1 {
   margin-top: 5rem;
-  font-weight: 800;
+  font-weight: 900;
 }
 .week-title-2 {
   margin-top: -1rem;

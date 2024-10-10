@@ -1,0 +1,40 @@
+body {
+  margin: 0;
+  /* overflow: hidden; */
+}
+
+canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100dvw;
+  height: 100dvh;
+  z-index: 99;
+}
+
+.scroll-container {
+  color: white;
+  width: 100dvw;
+  height: 500dvh;
+}
+
+/* html.lenis,
+html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+.lenis.lenis-smooth iframe {
+  pointer-events: none;
+} */
