@@ -1,5 +1,6 @@
 import GLSLNodeBuilder from './nodes/GLSLNodeBuilder.js';
 import Backend from '../common/Backend.js';
+import { getCacheKey } from '../common/RenderContext.js';
 
 import WebGLAttributeUtils from './utils/WebGLAttributeUtils.js';
 import WebGLState from './utils/WebGLState.js';
@@ -52,10 +53,16 @@ class WebGLBackend extends Backend {
 		this.trackTimestamp = ( parameters.trackTimestamp === true );
 
 		this.extensions.get( 'EXT_color_buffer_float' );
+		this.extensions.get( 'WEBGL_clip_cull_distance' );
+		this.extensions.get( 'OES_texture_float_linear' );
+		this.extensions.get( 'EXT_color_buffer_half_float' );
+		this.extensions.get( 'WEBGL_multisampled_render_to_texture' );
+		this.extensions.get( 'WEBGL_render_shared_exponent' );
 		this.extensions.get( 'WEBGL_multi_draw' );
 
 		this.disjoint = this.extensions.get( 'EXT_disjoint_timer_query_webgl2' );
 		this.parallel = this.extensions.get( 'KHR_parallel_shader_compile' );
+
 		this._currentContext = null;
 
 	}
@@ -201,7 +208,7 @@ class WebGLBackend extends Backend {
 
 			const { x, y, width, height } = renderContext.scissorValue;
 
-			gl.scissor( x, y, width, height );
+			gl.scissor( x, renderContext.height - height - y, width, height );
 
 		}
 
@@ -229,6 +236,20 @@ class WebGLBackend extends Backend {
 		const renderContextData = this.get( renderContext );
 		const previousContext = renderContextData.previousContext;
 
+		const occlusionQueryCount = renderContext.occlusionQueryCount;
+
+		if ( occlusionQueryCount > 0 ) {
+
+			if ( occlusionQueryCount > renderContextData.occlusionQueryIndex ) {
+
+				gl.endQuery( gl.ANY_SAMPLES_PASSED );
+
+			}
+
+			this.resolveOccludedAsync( renderContext );
+
+		}
+
 		const textures = renderContext.textures;
 
 		if ( textures !== null ) {
@@ -249,17 +270,17 @@ class WebGLBackend extends Backend {
 
 		this._currentContext = previousContext;
 
-
 		if ( renderContext.textures !== null && renderContext.renderTarget ) {
 
 			const renderTargetContextData = this.get( renderContext.renderTarget );
 
 			const { samples } = renderContext.renderTarget;
-			const fb = renderTargetContextData.framebuffer;
-
-			const mask = gl.COLOR_BUFFER_BIT;
 
 			if ( samples > 0 ) {
+
+				const fb = renderTargetContextData.framebuffers[ renderContext.getCacheKey() ];
+
+				const mask = gl.COLOR_BUFFER_BIT;
 
 				const msaaFrameBuffer = renderTargetContextData.msaaFrameBuffer;
 
@@ -272,9 +293,21 @@ class WebGLBackend extends Backend {
 
 					// TODO Add support for MRT
 
-					gl.blitFramebuffer( 0, 0, renderContext.width, renderContext.height, 0, 0, renderContext.width, renderContext.height, mask, gl.NEAREST );
+					if ( renderContext.scissor ) {
 
-					gl.invalidateFramebuffer( gl.READ_FRAMEBUFFER, renderTargetContextData.invalidationArray );
+						const { x, y, width, height } = renderContext.scissorValue;
+
+						const viewY = renderContext.height - height - y;
+
+						gl.blitFramebuffer( x, viewY, x + width, viewY + height, x, viewY, x + width, viewY + height, mask, gl.NEAREST );
+						gl.invalidateSubFramebuffer( gl.READ_FRAMEBUFFER, renderTargetContextData.invalidationArray, x, viewY, width, height );
+
+					} else {
+
+						gl.blitFramebuffer( 0, 0, renderContext.width, renderContext.height, 0, 0, renderContext.width, renderContext.height, mask, gl.NEAREST );
+						gl.invalidateFramebuffer( gl.READ_FRAMEBUFFER, renderTargetContextData.invalidationArray );
+
+					}
 
 				}
 
@@ -293,29 +326,9 @@ class WebGLBackend extends Backend {
 
 			} else {
 
-				const gl = this.gl;
-
 				gl.viewport( 0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight );
 
 			}
-
-		}
-
-		const occlusionQueryCount = renderContext.occlusionQueryCount;
-
-		if ( occlusionQueryCount > 0 ) {
-
-			const renderContextData = this.get( renderContext );
-
-			if ( occlusionQueryCount > renderContextData.occlusionQueryIndex ) {
-
-				const { gl } = this;
-
-				gl.endQuery( gl.ANY_SAMPLES_PASSED );
-
-			}
-
-			this.resolveOccludedAsync( renderContext );
 
 		}
 
@@ -394,7 +407,7 @@ class WebGLBackend extends Backend {
 		const gl = this.gl;
 		const { x, y, width, height } = renderContext.viewportValue;
 
-		gl.viewport( x, y, width, height );
+		gl.viewport( x, renderContext.height - height - y, width, height );
 
 	}
 
@@ -439,6 +452,12 @@ class WebGLBackend extends Backend {
 
 			const clearColor = descriptor.clearColorValue || this.getClearColor();
 
+			// premultiply alpha
+
+			clearColor.r *= clearColor.a;
+			clearColor.g *= clearColor.a;
+			clearColor.b *= clearColor.a;
+
 			if ( depth ) this.state.setDepthMask( true );
 
 			if ( descriptor.textures === null ) {
@@ -482,16 +501,16 @@ class WebGLBackend extends Backend {
 
 	beginCompute( computeGroup ) {
 
-		const gl = this.gl;
+		const { state, gl } = this;
 
-		gl.bindFramebuffer( gl.FRAMEBUFFER, null );
+		state.bindFramebuffer( gl.FRAMEBUFFER, null );
 		this.initTimestampQuery( computeGroup );
 
 	}
 
 	compute( computeGroup, computeNode, bindings, pipeline ) {
 
-		const gl = this.gl;
+		const { state, gl } = this;
 
 		if ( ! this.discard ) {
 
@@ -517,7 +536,7 @@ class WebGLBackend extends Backend {
 
 		}
 
-		gl.useProgram( programGPU );
+		state.useProgram( programGPU );
 
 		this._bindUniforms( bindings );
 
@@ -579,6 +598,10 @@ class WebGLBackend extends Backend {
 
 		const contextData = this.get( context );
 
+		const drawParms = renderObject.getDrawParameters();
+
+		if ( drawParms === null ) return;
+
 		//
 
 		this._bindUniforms( renderObject.getBindings() );
@@ -587,7 +610,7 @@ class WebGLBackend extends Backend {
 
 		state.setMaterial( material, frontFaceCW );
 
-		gl.useProgram( programGPU );
+		state.useProgram( programGPU );
 
 		//
 
@@ -616,10 +639,6 @@ class WebGLBackend extends Backend {
 		//
 
 		const index = renderObject.getIndex();
-
-		const geometry = renderObject.geometry;
-		const drawRange = renderObject.drawRange;
-		const firstVertex = drawRange.start;
 
 		//
 
@@ -651,7 +670,6 @@ class WebGLBackend extends Backend {
 		}
 
 		//
-
 		const renderer = this.bufferRenderer;
 
 		if ( object.isPoints ) renderer.mode = gl.POINTS;
@@ -675,32 +693,25 @@ class WebGLBackend extends Backend {
 
 		//
 
-
-		let count;
+		const { vertexCount, instanceCount } = drawParms;
+		let { firstVertex } = drawParms;
 
 		renderer.object = object;
 
 		if ( index !== null ) {
 
+			firstVertex *= index.array.BYTES_PER_ELEMENT;
+
 			const indexData = this.get( index );
-			const indexCount = ( drawRange.count !== Infinity ) ? drawRange.count : index.count;
 
 			renderer.index = index.count;
 			renderer.type = indexData.type;
-
-			count = indexCount;
 
 		} else {
 
 			renderer.index = 0;
 
-			const vertexCount = ( drawRange.count !== Infinity ) ? drawRange.count : geometry.attributes.position.count;
-
-			count = vertexCount;
-
 		}
-
-		const instanceCount = this.getInstanceCount( renderObject );
 
 		if ( object.isBatchedMesh ) {
 
@@ -720,11 +731,11 @@ class WebGLBackend extends Backend {
 
 		} else if ( instanceCount > 1 ) {
 
-			renderer.renderInstances( firstVertex, count, instanceCount );
+			renderer.renderInstances( firstVertex, vertexCount, instanceCount );
 
 		} else {
 
-			renderer.render( firstVertex, count );
+			renderer.render( firstVertex, vertexCount );
 
 		}
 		//
@@ -739,9 +750,9 @@ class WebGLBackend extends Backend {
 
 	}
 
-	getRenderCacheKey( renderObject ) {
+	getRenderCacheKey( /*renderObject*/ ) {
 
-		return renderObject.id;
+		return '';
 
 	}
 
@@ -778,9 +789,9 @@ class WebGLBackend extends Backend {
 
 	}
 
-	copyTextureToBuffer( texture, x, y, width, height ) {
+	copyTextureToBuffer( texture, x, y, width, height, faceIndex ) {
 
-		return this.textureUtils.copyTextureToBuffer( texture, x, y, width, height );
+		return this.textureUtils.copyTextureToBuffer( texture, x, y, width, height, faceIndex );
 
 	}
 
@@ -966,7 +977,7 @@ class WebGLBackend extends Backend {
 
 	_completeCompile( renderObject, pipeline ) {
 
-		const gl = this.gl;
+		const { state, gl } = this;
 		const pipelineData = this.get( pipeline );
 		const { programGPU, fragmentShader, vertexShader } = pipelineData;
 
@@ -976,7 +987,7 @@ class WebGLBackend extends Backend {
 
 		}
 
-		gl.useProgram( programGPU );
+		state.useProgram( programGPU );
 
 		// Bindings
 
@@ -994,7 +1005,7 @@ class WebGLBackend extends Backend {
 
 	createComputePipeline( computePipeline, bindings ) {
 
-		const gl = this.gl;
+		const { state, gl } = this;
 
 		// Program
 
@@ -1044,7 +1055,7 @@ class WebGLBackend extends Backend {
 
 		}
 
-		gl.useProgram( programGPU );
+		state.useProgram( programGPU );
 
 		// Bindings
 
@@ -1096,40 +1107,52 @@ class WebGLBackend extends Backend {
 
 	updateBindings( bindGroup, bindings ) {
 
+		if ( ! bindGroup ) return;
+
 		const { gl } = this;
 
-		let groupIndex = 0;
-		let textureIndex = 0;
+		const bindingsData = this.get( bindings );
+		const bindGroupData = this.get( bindGroup );
 
-		for ( const bindGroup of bindings ) {
+		if ( bindingsData.textureIndex === undefined ) bindingsData.textureIndex = 0;
 
-			for ( const binding of bindGroup.bindings ) {
+		if ( bindGroupData.textureIndex === undefined ) {
 
-				if ( binding.isUniformsGroup || binding.isUniformBuffer ) {
+			bindGroupData.textureIndex = bindingsData.textureIndex;
 
-					const bufferGPU = gl.createBuffer();
-					const data = binding.buffer;
+		} else {
 
-					gl.bindBuffer( gl.UNIFORM_BUFFER, bufferGPU );
-					gl.bufferData( gl.UNIFORM_BUFFER, data, gl.DYNAMIC_DRAW );
-					gl.bindBufferBase( gl.UNIFORM_BUFFER, groupIndex, bufferGPU );
+			// reset textureIndex to match previous mappimgs when rebuilt
+			bindingsData.textureIndex = bindGroupData.textureIndex;
 
-					this.set( binding, {
-						index: groupIndex ++,
-						bufferGPU
-					} );
+		}
 
-				} else if ( binding.isSampledTexture ) {
+		let i = 0;
 
-					const { textureGPU, glTextureType } = this.get( binding.texture );
+		for ( const binding of bindGroup.bindings ) {
 
-					this.set( binding, {
-						index: textureIndex ++,
-						textureGPU,
-						glTextureType
-					} );
+			if ( binding.isUniformsGroup || binding.isUniformBuffer ) {
 
-				}
+				const data = binding.buffer;
+				const bufferGPU = gl.createBuffer();
+
+				gl.bindBuffer( gl.UNIFORM_BUFFER, bufferGPU );
+				gl.bufferData( gl.UNIFORM_BUFFER, data, gl.DYNAMIC_DRAW );
+
+				this.set( binding, {
+					index: bindGroup.index * 2 + i ++,
+					bufferGPU
+				} );
+
+			} else if ( binding.isSampledTexture ) {
+
+				const { textureGPU, glTextureType } = this.get( binding.texture );
+
+				this.set( binding, {
+					index: bindingsData.textureIndex ++,
+					textureGPU,
+					glTextureType
+				} );
 
 			}
 
@@ -1218,7 +1241,6 @@ class WebGLBackend extends Backend {
 
 	}
 
-
 	getMaxAnisotropy() {
 
 		return this.capabilities.getMaxAnisotropy();
@@ -1231,44 +1253,44 @@ class WebGLBackend extends Backend {
 
 	}
 
-	copyFramebufferToTexture( texture, renderContext ) {
+	copyFramebufferToTexture( texture, renderContext, rectangle ) {
 
-		this.textureUtils.copyFramebufferToTexture( texture, renderContext );
+		this.textureUtils.copyFramebufferToTexture( texture, renderContext, rectangle );
 
 	}
 
-	_setFramebuffer( renderContext ) {
+	_setFramebuffer( descriptor ) {
 
 		const { gl, state } = this;
 
 		let currentFrameBuffer = null;
 
-		if ( renderContext.textures !== null ) {
+		if ( descriptor.textures !== null ) {
 
-			const renderTarget = renderContext.renderTarget;
+			const renderTarget = descriptor.renderTarget;
 			const renderTargetContextData = this.get( renderTarget );
 			const { samples, depthBuffer, stencilBuffer } = renderTarget;
-			const cubeFace = this.renderer._activeCubeFace;
+
 			const isCube = renderTarget.isWebGLCubeRenderTarget === true;
 
 			let msaaFb = renderTargetContextData.msaaFrameBuffer;
 			let depthRenderbuffer = renderTargetContextData.depthRenderbuffer;
 
+			const cacheKey = getCacheKey( descriptor );
+
 			let fb;
 
 			if ( isCube ) {
 
-				if ( renderTargetContextData.cubeFramebuffers === undefined ) {
+				renderTargetContextData.cubeFramebuffers || ( renderTargetContextData.cubeFramebuffers = {} );
 
-					renderTargetContextData.cubeFramebuffers = [];
-
-				}
-
-				fb = renderTargetContextData.cubeFramebuffers[ cubeFace ];
+				fb = renderTargetContextData.cubeFramebuffers[ cacheKey ];
 
 			} else {
 
-				fb = renderTargetContextData.framebuffer;
+				renderTargetContextData.framebuffers || ( renderTargetContextData.framebuffers = {} );
+
+				fb = renderTargetContextData.framebuffers[ cacheKey ];
 
 			}
 
@@ -1278,22 +1300,27 @@ class WebGLBackend extends Backend {
 
 				state.bindFramebuffer( gl.FRAMEBUFFER, fb );
 
-				const textures = renderContext.textures;
+				const textures = descriptor.textures;
 
 				if ( isCube ) {
 
-					renderTargetContextData.cubeFramebuffers[ cubeFace ] = fb;
+					renderTargetContextData.cubeFramebuffers[ cacheKey ] = fb;
+
 					const { textureGPU } = this.get( textures[ 0 ] );
+
+					const cubeFace = this.renderer._activeCubeFace;
 
 					gl.framebufferTexture2D( gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_CUBE_MAP_POSITIVE_X + cubeFace, textureGPU, 0 );
 
 				} else {
 
+					renderTargetContextData.framebuffers[ cacheKey ] = fb;
+
 					for ( let i = 0; i < textures.length; i ++ ) {
 
 						const texture = textures[ i ];
 						const textureData = this.get( texture );
-						textureData.renderTarget = renderContext.renderTarget;
+						textureData.renderTarget = descriptor.renderTarget;
 
 						const attachment = gl.COLOR_ATTACHMENT0 + i;
 
@@ -1301,15 +1328,13 @@ class WebGLBackend extends Backend {
 
 					}
 
-					renderTargetContextData.framebuffer = fb;
-
-					state.drawBuffers( renderContext, fb );
+					state.drawBuffers( descriptor, fb );
 
 				}
 
-				if ( renderContext.depthTexture !== null ) {
+				if ( descriptor.depthTexture !== null ) {
 
-					const textureData = this.get( renderContext.depthTexture );
+					const textureData = this.get( descriptor.depthTexture );
 					const depthStyle = stencilBuffer ? gl.DEPTH_STENCIL_ATTACHMENT : gl.DEPTH_ATTACHMENT;
 
 					gl.framebufferTexture2D( gl.FRAMEBUFFER, depthStyle, gl.TEXTURE_2D, textureData.textureGPU, 0 );
@@ -1330,10 +1355,9 @@ class WebGLBackend extends Backend {
 
 					const msaaRenderbuffers = [];
 
-					const textures = renderContext.textures;
+					const textures = descriptor.textures;
 
 					for ( let i = 0; i < textures.length; i ++ ) {
-
 
 						msaaRenderbuffers[ i ] = gl.createRenderbuffer();
 
@@ -1348,10 +1372,10 @@ class WebGLBackend extends Backend {
 
 						}
 
-						const texture = renderContext.textures[ i ];
+						const texture = descriptor.textures[ i ];
 						const textureData = this.get( texture );
 
-						gl.renderbufferStorageMultisample( gl.RENDERBUFFER, samples, textureData.glInternalFormat, renderContext.width, renderContext.height );
+						gl.renderbufferStorageMultisample( gl.RENDERBUFFER, samples, textureData.glInternalFormat, descriptor.width, descriptor.height );
 						gl.framebufferRenderbuffer( gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + i, gl.RENDERBUFFER, msaaRenderbuffers[ i ] );
 
 
@@ -1363,7 +1387,7 @@ class WebGLBackend extends Backend {
 					if ( depthRenderbuffer === undefined ) {
 
 						depthRenderbuffer = gl.createRenderbuffer();
-						this.textureUtils.setupRenderBufferStorage( depthRenderbuffer, renderContext );
+						this.textureUtils.setupRenderBufferStorage( depthRenderbuffer, descriptor );
 
 						renderTargetContextData.depthRenderbuffer = depthRenderbuffer;
 
@@ -1510,7 +1534,7 @@ class WebGLBackend extends Backend {
 
 		}
 
-		const gl = this.gl;
+		const { gl } = this;
 
 		transformFeedbackGPU = gl.createTransformFeedback();
 
@@ -1575,7 +1599,8 @@ class WebGLBackend extends Backend {
 
 				if ( binding.isUniformsGroup || binding.isUniformBuffer ) {
 
-					gl.bindBufferBase( gl.UNIFORM_BUFFER, index, bindingData.bufferGPU );
+					// TODO USE bindBufferRange to group multiple uniform buffers
+					state.bindBufferBase( gl.UNIFORM_BUFFER, index, bindingData.bufferGPU );
 
 				} else if ( binding.isSampledTexture ) {
 

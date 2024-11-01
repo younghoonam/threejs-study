@@ -1,8 +1,14 @@
-import Node, { addNodeClass } from './Node.js';
-import { cond } from '../math/CondNode.js';
-import { ShaderNode, nodeProxy, getCurrentStack, setCurrentStack } from '../shadernode/ShaderNode.js';
+import Node from './Node.js';
+import { select } from '../math/ConditionalNode.js';
+import { ShaderNode, nodeProxy, getCurrentStack, setCurrentStack } from '../tsl/TSLBase.js';
 
 class StackNode extends Node {
+
+	static get type() {
+
+		return 'StackNode';
+
+	}
 
 	constructor( parent = null ) {
 
@@ -33,19 +39,19 @@ class StackNode extends Node {
 
 	}
 
-	if( boolNode, method ) {
+	If( boolNode, method ) {
 
 		const methodNode = new ShaderNode( method );
-		this._currentCond = cond( boolNode, methodNode );
+		this._currentCond = select( boolNode, methodNode );
 
 		return this.add( this._currentCond );
 
 	}
 
-	elseif( boolNode, method ) {
+	ElseIf( boolNode, method ) {
 
 		const methodNode = new ShaderNode( method );
-		const ifNode = cond( boolNode, methodNode );
+		const ifNode = select( boolNode, methodNode );
 
 		this._currentCond.elseNode = ifNode;
 		this._currentCond = ifNode;
@@ -54,7 +60,7 @@ class StackNode extends Node {
 
 	}
 
-	else( method ) {
+	Else( method ) {
 
 		this._currentCond.elseNode = new ShaderNode( method );
 
@@ -80,10 +86,24 @@ class StackNode extends Node {
 
 	}
 
+	//
+
+	else( ...params ) { // @deprecated, r168
+
+		console.warn( 'TSL.StackNode: .else() has been renamed to .Else().' );
+		return this.Else( ...params );
+
+	}
+
+	elseif( ...params ) { // @deprecated, r168
+
+		console.warn( 'TSL.StackNode: .elseif() has been renamed to .ElseIf().' );
+		return this.ElseIf( ...params );
+
+	}
+
 }
 
 export default StackNode;
 
-export const stack = nodeProxy( StackNode );
-
-addNodeClass( 'StackNode', StackNode );
+export const stack = /*@__PURE__*/ nodeProxy( StackNode );

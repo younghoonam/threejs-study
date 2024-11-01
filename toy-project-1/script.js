@@ -82,7 +82,7 @@ scene.add(directionalLight);
 const loader = new GLTFLoader();
 loader.load(
   // resource URL
-  "/toy-shape.glb",
+  "toy-shape.glb",
   // called when the resource is loaded
   function (gltf) {
     model = gltf.scene;

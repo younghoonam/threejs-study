@@ -8,6 +8,7 @@ body {
 
   font-style: normal;
   font-variation-settings: "slnt" 0;
+  pointer-events: none;
 }
 
 canvas {
@@ -16,7 +17,13 @@ canvas {
   left: 0;
   width: 100dvw;
   height: 100dvh;
-  z-index: -99;
+  z-index: -1;
+
+  pointer-events: all;
+}
+
+.lil-gui {
+  pointer-events: all;
 }
 
 .container {
@@ -25,7 +32,6 @@ canvas {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-
   overflow-x: hidden;
 }
 

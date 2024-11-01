@@ -1,14 +1,17 @@
-import Node, { addNodeClass } from './Node.js';
-import { varying } from './VaryingNode.js';
-import { nodeObject } from '../shadernode/ShaderNode.js';
+import Node from './Node.js';
+import { nodeObject, varying } from '../tsl/TSLBase.js';
 
 class AttributeNode extends Node {
 
-	constructor( attributeName, nodeType = null, defaultNode = null ) {
+	static get type() {
+
+		return 'AttributeNode';
+
+	}
+
+	constructor( attributeName, nodeType = null ) {
 
 		super( nodeType );
-
-		this.defaultNode = defaultNode;
 
 		this.global = true;
 
@@ -24,7 +27,7 @@ class AttributeNode extends Node {
 
 	getNodeType( builder ) {
 
-		let nodeType = super.getNodeType( builder );
+		let nodeType = this.nodeType;
 
 		if ( nodeType === null ) {
 
@@ -91,17 +94,7 @@ class AttributeNode extends Node {
 
 			console.warn( `AttributeNode: Vertex attribute "${ attributeName }" not found on geometry.` );
 
-			const { defaultNode } = this;
-
-			if ( defaultNode !== null ) {
-
-				return defaultNode.build( builder, nodeType );
-
-			} else {
-
-				return builder.generateConst( nodeType );
-
-			}
+			return builder.generateConst( nodeType );
 
 		}
 
@@ -129,6 +122,4 @@ class AttributeNode extends Node {
 
 export default AttributeNode;
 
-export const attribute = ( name, nodeType, defaultNode ) => nodeObject( new AttributeNode( name, nodeType, nodeObject( defaultNode ) ) );
-
-addNodeClass( 'AttributeNode', AttributeNode );
+export const attribute = ( name, nodeType ) => nodeObject( new AttributeNode( name, nodeType ) );

@@ -1,11 +1,18 @@
 import TempNode from '../core/TempNode.js';
-import { uv } from '../accessors/UVNode.js';
-import { addNodeElement, tslFn, nodeObject, vec2, vec4 } from '../shadernode/ShaderNode.js';
+import { uv } from '../accessors/UV.js';
+import { Fn, nodeObject, vec2, vec4 } from '../tsl/TSLBase.js';
 import { NodeUpdateType } from '../core/constants.js';
 import { uniform } from '../core/UniformNode.js';
 import { clamp } from '../math/MathNode.js';
+import { convertToTexture } from '../utils/RTTNode.js';
 
 class DepthOfFieldNode extends TempNode {
+
+	static get type() {
+
+		return 'DepthOfFieldNode';
+
+	}
 
 	constructor( textureNode, viewZNode, focusNode, apertureNode, maxblurNode ) {
 
@@ -39,7 +46,7 @@ class DepthOfFieldNode extends TempNode {
 
 		const sampleTexture = ( uv ) => textureNode.uv( uv );
 
-		const dof = tslFn( () => {
+		const dof = Fn( () => {
 
 			const aspectcorrect = vec2( 1.0, this._aspect );
 
@@ -112,8 +119,6 @@ class DepthOfFieldNode extends TempNode {
 
 }
 
-export const dof = ( node, viewZNode, focus = 1, aperture = 0.025, maxblur = 1 ) => nodeObject( new DepthOfFieldNode( nodeObject( node ).toTexture(), nodeObject( viewZNode ), nodeObject( focus ), nodeObject( aperture ), nodeObject( maxblur ) ) );
-
-addNodeElement( 'dof', dof );
-
 export default DepthOfFieldNode;
+
+export const dof = ( node, viewZNode, focus = 1, aperture = 0.025, maxblur = 1 ) => nodeObject( new DepthOfFieldNode( convertToTexture( node ), nodeObject( viewZNode ), nodeObject( focus ), nodeObject( aperture ), nodeObject( maxblur ) ) );

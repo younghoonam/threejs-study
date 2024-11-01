@@ -48,6 +48,7 @@ class WebGLState {
 		this.maxTextures = this.gl.getParameter( this.gl.MAX_TEXTURE_IMAGE_UNITS );
 		this.currentTextureSlot = null;
 		this.currentBoundTextures = {};
+		this.currentBoundBufferBases = {};
 
 		if ( initialized === false ) {
 
@@ -511,7 +512,7 @@ class WebGLState {
 
 		this.setPolygonOffset( material.polygonOffset, material.polygonOffsetFactor, material.polygonOffsetUnits );
 
-		material.alphaToCoverage === true
+		material.alphaToCoverage === true && this.backend.renderer.samples > 1
 			? this.enable( gl.SAMPLE_ALPHA_TO_COVERAGE )
 			: this.disable( gl.SAMPLE_ALPHA_TO_COVERAGE );
 
@@ -648,7 +649,6 @@ class WebGLState {
 
 		}
 
-
 	}
 
 
@@ -710,11 +710,29 @@ class WebGLState {
 			boundTexture.type = webglType;
 			boundTexture.texture = webglTexture;
 
+		}
+
+	}
+
+	bindBufferBase( target, index, buffer ) {
+
+		const { gl } = this;
+
+		const key = `${target}-${index}`;
+
+		if ( this.currentBoundBufferBases[ key ] !== buffer ) {
+
+			gl.bindBufferBase( target, index, buffer );
+			this.currentBoundBufferBases[ key ] = buffer;
+
+			return true;
 
 		}
 
+		return false;
 
 	}
+
 
 	unbindTexture() {
 
