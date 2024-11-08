@@ -1,3 +1,5 @@
+import gsap from "gsap";
+
 // Initialize GSAP
 gsap.registerPlugin(ScrollTrigger);
 
@@ -23,3 +25,21 @@ fadeElements.forEach((element) => {
     }
   );
 });
+
+// const keyframeElements = gsap.utils.toArray(".keyframe");
+
+// for (let index = 0; index < keyframeElements.length; index++) {
+//   const element = keyframeElements[index];
+//   const nextElement = keyframeElements[index + 1];
+//   gsap.to(element, {
+//     scrollTrigger: {
+//       trigger: element,
+//       scrub: true,
+//       onUpdate: (self) => {
+//         if (index != keyframeElements.length - 1)
+//           console.log(element.id, getScrollProgress(element, nextElement));
+//         if (index == keyframeElements.length - 1) console.log("df");
+//       },
+//     },
+//   });
+// }

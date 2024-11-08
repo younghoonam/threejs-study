@@ -8,7 +8,7 @@ class GeometryMorpher {
     // Precomputed bounding distance for normalization factor
     this.maxDistance = this.initialGeometry.boundingBox.max.x;
 
-    this.waveLength = 0.0012; //파장
+    this.waveLength = 0.002; //파장
     this.waveAmplitude = 0.00125; //진폭
     this.waveSpeed = 5;
   }
