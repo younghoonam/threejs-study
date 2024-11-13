@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import gsap from "gsap";
+
 // Example usage
 const shadesData = [
   {
@@ -126,7 +128,7 @@ let shadeDiscGeometry;
 loader.load("../toy-project-2/shadeDisc.glb", (glb) => {
   shadeDiscGeometry = glb.scene.children[0].geometry;
   createShadeCards(shadesData);
-  console.log(shadeDiscGeometry);
+  // console.log(shadeDiscGeometry);
 });
 
 function createShadeCards(shadeCardsData) {
@@ -158,11 +160,16 @@ function createShadeCards(shadeCardsData) {
     sideScrollContainer.appendChild(shadeCard);
 
     // Initialize Three.js scene for each shadeCanvas
-    initializeThreeScene(shadeCanvas, materialConfig);
+    initializeThreeScene(
+      shadeCard,
+      sideScrollContainer,
+      shadeCanvas,
+      materialConfig
+    );
   });
 }
 
-function initializeThreeScene(canvas, materialConfig) {
+function initializeThreeScene(container, scroller, canvas, materialConfig) {
   // Create scene, camera, and renderer
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(
@@ -213,6 +220,21 @@ function initializeThreeScene(canvas, materialConfig) {
   }
 
   animate();
+
+  gsap.to(cylinder.rotation, {
+    z: 3.14,
+    duration: 0.8,
+    ease: "power2.out",
+    scrollTrigger: {
+      trigger: container,
+      horizontal: true,
+      start: "left center",
+      end: "right center",
+      scroller: scroller,
+      toggleActions: "play reverse play reverse",
+      // markers: true,
+    },
+  });
 
   // Handle resizing
   window.addEventListener("resize", () => {

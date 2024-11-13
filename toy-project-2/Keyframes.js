@@ -28,7 +28,7 @@ class Keyframes {
       this.progress[index] = progress;
     }
 
-    console.log(this.currentSection, this.progress, this.wholeProgress);
+    // console.log(this.currentSection, this.progress, this.wholeProgress);
   }
 }
 

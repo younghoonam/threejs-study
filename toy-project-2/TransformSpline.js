@@ -170,7 +170,7 @@ class TransformSpline {
 
   // Update target transform based on scroll progress
   updateTargetTransform(posProgress, rotProgress) {
-    console.log(posProgress, rotProgress);
+    // console.log(posProgress, rotProgress);
     this.targetPosition.copy(this.positionSpline.getPoint(posProgress));
     this.targetRotation.setFromVector3(
       this.rotationSpline.getPoint(rotProgress)

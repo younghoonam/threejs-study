@@ -23,6 +23,7 @@ import { TransformSpline } from "./TransformSpline.js";
 import { GeometryMorpher } from "./GeometryMorpher.js";
 import { Keyframes } from "./Keyframes.js";
 import * as Utils from "./Utils.js";
+import { label, texture } from "three/webgpu";
 
 // Constants
 const BACKGROUND_DISC_ROTATION = 0.001;
@@ -105,7 +106,7 @@ const depthOfFieldEffect = new DepthOfFieldEffect(camera, {
   worldFocusRange: 10,
   bokehScale: 10,
 });
-console.log(depthOfFieldEffect);
+// console.log(depthOfFieldEffect);
 initPmndrs();
 function initPmndrs() {
   const composer = new EffectComposer(renderer);
@@ -134,9 +135,26 @@ async function loadModelTransformSpline() {
     reflectivity: 1,
   });
 
+  const texture = new THREE.TextureLoader().load("../toy-project-2/label.png");
+  texture.center.set(0.5, 0.5);
+  // texture.repeat.set(1, 1);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  // texture.colorSpace = THREE.SRGBColorSpace;
+  const labelMaterial = new THREE.MeshStandardMaterial({
+    map: texture,
+  });
+
   model.traverse((mesh) => {
     if (mesh.isMesh) {
       mesh.material = material;
+    }
+  });
+
+  model.traverse((mesh) => {
+    if (mesh.name == "label") {
+      console.log(labelMaterial);
+      mesh.material = labelMaterial;
     }
   });
 
@@ -154,7 +172,7 @@ async function loadModelTransformSpline() {
     scene
   );
   modelTransformSpline.addKeyframes(keyframes);
-  console.log(modelTransformSpline);
+  // console.log(modelTransformSpline);
 }
 
 async function loadModel() {
@@ -266,7 +284,7 @@ const gui = new GUI();
 gui.show(false);
 const guiParams = {
   logPositionPoints: function () {
-    console.log(modelTransformSpline.positionSpline.points);
+    // console.log(modelTransformSpline.positionSpline.points);
   },
   showTransformControls: false,
 };
@@ -275,7 +293,7 @@ gui.add(guiParams, "showTransformControls").onChange((show) => {
   if (show) modelTransformSpline.addHandlesToScene();
   else modelTransformSpline.removeHandlesFromScene();
 });
-console.log;
+
 const DOFFolder = gui.addFolder("DepthOfField");
 DOFFolder.add(
   depthOfFieldEffect.cocMaterial,
