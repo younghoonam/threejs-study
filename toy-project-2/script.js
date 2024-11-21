@@ -18,12 +18,15 @@ import {
   FXAAEffect,
 } from "postprocessing";
 
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GUI } from "three/addons/libs/lil-gui.module.min.js";
 import { TransformSpline } from "./TransformSpline.js";
 import { GeometryMorpher } from "./GeometryMorpher.js";
 import { Keyframes } from "./Keyframes.js";
 import * as Utils from "./Utils.js";
 import { label, texture } from "three/webgpu";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 
 // Constants
 const BACKGROUND_DISC_ROTATION = 0.001;
@@ -36,7 +39,12 @@ const maxYPos = -minYPos;
 
 // Global Variables
 let discSpeed = BACKGROUND_DISC_STANDARD_SPEED;
-let model, morphingModel, modelTransformSpline, geometryMorpher;
+let model,
+  morphingModel,
+  modelTransformSpline,
+  geometryMorpher,
+  animationMixer,
+  animationAction;
 const backgroundDiscs = [];
 const postprocessing = {};
 const clock = new THREE.Clock();
@@ -63,27 +71,47 @@ const renderer = new THREE.WebGLRenderer({
   stencil: false,
   depth: false,
 });
+renderer.shadowMap.enabled = true;
 renderer.setClearColor(0xcac6c5, 1);
 renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
 renderer.setAnimationLoop(animate);
 
 // Lighting Setup
+let shadow;
 setupLights();
+
 function setupLights() {
   const ambientLight = new THREE.AmbientLight("white", 0.5);
   scene.add(ambientLight);
 
   const lights = [
-    { color: "white", intensity: 2, position: [0.3, 1, 0.2] },
+    {
+      color: 0xf6f6f0,
+      intensity: 2,
+      position: [0.6, 2, 0.4],
+      castShadow: true,
+    },
     { color: "pink", intensity: 0.5, position: [0, -1, 0] },
     { color: "salmon", intensity: 0.7, position: [1, 0, -1] },
     { color: "slateblue", intensity: 0.3, position: [-1, -0.5, 0.5] },
-    { color: "white", intensity: 2, position: [-1, 0, 0.5] },
+    { color: 0xf6f6f0, intensity: 2, position: [-2, 0, 1] },
   ];
 
-  lights.forEach(({ color, intensity, position }) => {
+  lights.forEach(({ color, intensity, position, castShadow }) => {
     const light = new THREE.DirectionalLight(color, intensity);
     light.position.set(...position);
+
+    if (castShadow) {
+      shadow = light.shadow;
+      light.castShadow = true;
+      shadow.mapSize.set(4096, 4096);
+      shadow.camera.top = 2.5;
+      shadow.camera.bottom = -2.5;
+      shadow.camera.right = 2.5;
+      shadow.camera.left = -2.5;
+      shadow.camera.far = 5;
+    }
+
     scene.add(light);
   });
 }
@@ -111,7 +139,7 @@ initPmndrs();
 function initPmndrs() {
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
-  composer.addPass(new EffectPass(camera, depthOfFieldEffect));
+  // composer.addPass(new EffectPass(camera, depthOfFieldEffect))
   composer.addPass(new EffectPass(camera, new FXAAEffect()));
   postprocessing.composer = composer;
 }
@@ -124,8 +152,20 @@ async function loadModelTransformSpline() {
     loadTransformPoints(),
   ]);
 
+  console.log(gltf);
   model = gltf.scene;
-  console.log(model);
+
+  // Initialize the animation mixer
+  animationMixer = new THREE.AnimationMixer(model);
+
+  // Get the animation clips from the model
+  const clips = gltf.animations;
+
+  // Play the first animation (or choose the desired one)
+  animationAction = animationMixer.clipAction(clips[0], model);
+  animationAction.clampWhenFinished = true;
+  animationAction.play();
+  initMixerGsap();
 
   // model.children[0].material.roughness = 0;
   // model.children[0].material.reflectivity = 1;
@@ -137,29 +177,35 @@ async function loadModelTransformSpline() {
 
   const texture = new THREE.TextureLoader().load("../toy-project-2/label.png");
   texture.center.set(0.5, 0.5);
-  // texture.repeat.set(1, 1);
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
-  // texture.colorSpace = THREE.SRGBColorSpace;
-  const labelMaterial = new THREE.MeshStandardMaterial({
+  const labelMaterial = new THREE.MeshPhysicalMaterial({
+    // color: 0xff0000,
     map: texture,
   });
 
   model.traverse((mesh) => {
     if (mesh.isMesh) {
       mesh.material = material;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
     }
   });
 
   model.traverse((mesh) => {
     if (mesh.name == "label") {
-      console.log(labelMaterial);
+      console.log("found label");
       mesh.material = labelMaterial;
     }
   });
 
   model.scale.multiplyScalar(15);
-  morphingModel = model.children.find((child) => child.name == "top");
+  model.traverse((mesh) => {
+    if (mesh.name == "top") {
+      morphingModel = mesh;
+    }
+  });
+  // morphingModel = model.children.find((child) => child.name == "top");
   geometryMorpher = new GeometryMorpher(morphingModel.geometry);
 
   scene.add(model);
@@ -177,7 +223,7 @@ async function loadModelTransformSpline() {
 
 async function loadModel() {
   const loader = new GLTFLoader();
-  const gltf = await loader.loadAsync("../toy-project-2/disc.glb");
+  const gltf = await loader.loadAsync("../toy-project-2/disc-animation.glb");
   return gltf;
 }
 
@@ -227,7 +273,11 @@ function animate() {
   if (modelTransformSpline && geometryMorpher) {
     modelTransformSpline.update();
     geometryMorpher.morph(clock);
+    animationMixer.setTime(time.t);
   }
+
+  controls.update();
+
   transformBackgroundDiscs();
   postprocessing.composer.render();
 }
@@ -305,3 +355,27 @@ DOFFolder.add(
 DOFFolder.add(depthOfFieldEffect.cocMaterial, "worldFocusRange", 0, 10, 0.1);
 DOFFolder.add(depthOfFieldEffect, "bokehScale", 0, 10, 0.1);
 DOFFolder.add(depthOfFieldEffect.blendMode, "blendFunction", 0, 50, 1);
+
+const shadowFolder = gui.addFolder("Shadow");
+shadowFolder.add(shadow, "bias", 0, 0.001, 0.0001);
+shadowFolder.add(shadow, "normalBias", 0, 0.001, 0.0001);
+shadowFolder.add(shadow, "blurSamples", 0, 30, 1);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+
+gsap.registerPlugin(ScrollTrigger);
+
+let time = { t: 0 };
+function initMixerGsap() {
+  gsap.to(time, {
+    t: animationAction.getClip().duration - 0.01,
+    duration: 2,
+    scrollTrigger: {
+      trigger: "#openAnimation",
+      start: "top top",
+      end: "bottom bottom",
+      scroller: ".container",
+      toggleActions: "play reverse play reverse",
+    },
+  });
+}

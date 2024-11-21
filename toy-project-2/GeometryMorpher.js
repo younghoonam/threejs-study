@@ -6,10 +6,17 @@ class GeometryMorpher {
     this.initialGeometry = new THREE.BufferGeometry().copy(this.geometry);
 
     // Precomputed bounding distance for normalization factor
-    this.maxDistance = this.initialGeometry.boundingBox.max.x;
+    this.boundingBoxSize = new THREE.Vector3();
+    this.initialGeometry.boundingBox.getSize(this.boundingBoxSize);
+
+    this.boundingBoxCenter = new THREE.Vector3();
+    this.initialGeometry.boundingBox.getCenter(this.boundingBoxCenter);
+
+    console.log(this.boundingBoxSize);
+    this.maxDistance = this.boundingBoxSize.x / 2;
 
     this.waveLength = 0.002; //파장
-    this.waveAmplitude = 0.00125; //진폭
+    this.waveAmplitude = 0.0015; //진폭
     this.waveSpeed = 5;
   }
 
@@ -22,7 +29,10 @@ class GeometryMorpher {
       const xPos = posAttribute.getX(index);
       const zPos = posAttribute.getZ(index);
 
-      const distanceFromCenter = Math.hypot(xPos, zPos);
+      const distanceFromCenter = Math.hypot(
+        this.boundingBoxCenter.x - xPos,
+        this.boundingBoxCenter.z - zPos
+      );
       const factor = (this.maxDistance - distanceFromCenter) / this.maxDistance;
 
       const waveOffset =

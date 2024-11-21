@@ -1,5 +1,6 @@
 @import url("https://fonts.googleapis.com/css2?family=Afacad+Flux:wght@100..1000&family=Lilita+One&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&family=Shippori+Antique+B1&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@100..900&display=swap");
 html {
   --container-inline-padding: 1.5rem;
 }
@@ -16,6 +17,8 @@ body {
   /* pointer-events: none; */
 
   overflow-x: hidden;
+
+  background-color: #cac6c5;
 }
 
 .snap-container {
@@ -28,11 +31,22 @@ body {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100dvw;
-  height: 100dvh;
+  width: 100vw;
+  height: 100vh;
   z-index: -1;
 
   pointer-events: all;
+}
+
+#cardCanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1;
+
+  pointer-events: none;
 }
 
 .lil-gui {
@@ -76,7 +90,6 @@ h3 {
   margin-top: 0.5rem;
 }
 .footer {
-  height: 100vh;
 }
 .left {
   text-align: left;
@@ -106,7 +119,7 @@ h3 {
 }
 
 .snap-section {
-  scroll-snap-align: start end;
+  /* scroll-snap-align: start end; */
 }
 
 .width-max {
@@ -140,7 +153,7 @@ h3 {
   scroll-snap-type: center center;
 
   margin-left: 1rem;
-  width: clamp(10rem, 60vw, 25rem);
+  width: clamp(20rem, 60vw, 25rem);
   border-radius: 3rem;
   background-color: rgba(255, 255, 255, 0.5);
   backdrop-filter: blur(10px);
@@ -156,7 +169,7 @@ h3 {
 .shade-canvas {
   /* background-color: #222; */
 
-  width: 130%;
+  width: 100%;
 }
 
 .shade-card-title {
@@ -176,6 +189,8 @@ h3 {
 .lineup {
   height: 100vh;
 
+  margin-top: 15rem;
+
   display: grid;
   grid-template-columns: 100%;
   grid-template-rows: 8rem auto;
@@ -188,7 +203,7 @@ h3 {
   padding-bottom: 2rem;
 
   margin-left: 1rem;
-  width: clamp(10rem, 85vw, 25rem);
+  width: clamp(20rem, 85vw, 25rem);
   border-radius: 3rem;
   background-color: rgba(255, 255, 255, 0.5);
   backdrop-filter: blur(10px);
@@ -204,7 +219,7 @@ h3 {
 .lineup-canvas {
   /* background-color: #222; */
 
-  width: 130%;
+  width: 100%;
 }
 
 .lineup-card-title {

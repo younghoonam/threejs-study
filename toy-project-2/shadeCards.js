@@ -123,13 +123,154 @@ const shadesData = [
   },
 ];
 
+const lineupProductsData = [
+  {
+    title: "MONSKIN 벨벳 쿠션",
+    skinTypeExpression: "실키 매트",
+    recommendedSkinType: "복합성, 지성",
+    moistureLevel: 2,
+    finishLevel: 4,
+    thicknessLevel: 3,
+  },
+  {
+    title: "MONSKIN 글로우 쿠션",
+    skinTypeExpression: "광채 글로우",
+    recommendedSkinType: "건성, 복합성",
+    moistureLevel: 4,
+    finishLevel: 3,
+    thicknessLevel: 2,
+  },
+  {
+    title: "MONSKIN 내추럴 쿠션",
+    skinTypeExpression: "내추럴 피니시",
+    recommendedSkinType: "모든 피부 타입",
+    moistureLevel: 3,
+    finishLevel: 3,
+    thicknessLevel: 3,
+  },
+];
+
+const shadeViewports = [],
+  lineupViewports = [];
+let renderer, shadeDiscGeometry, compactModel;
+let shadeLoaded = false;
+let compactLoaded = false;
+const canvas = document.querySelector("#cardCanvas");
+
 const loader = new GLTFLoader();
-let shadeDiscGeometry;
 loader.load("../toy-project-2/shadeDisc.glb", (glb) => {
   shadeDiscGeometry = glb.scene.children[0].geometry;
-  createShadeCards(shadesData);
-  // console.log(shadeDiscGeometry);
+  shadeLoaded = true;
+  if (compactLoaded) {
+    init();
+  }
 });
+loader.load("../toy-project-2/disc-animation.glb", (glb) => {
+  compactModel = glb.scene;
+  compactModel.scale.multiplyScalar(25);
+  console.log(compactModel);
+  compactLoaded = true;
+  if (shadeLoaded) {
+    init();
+  }
+});
+
+function init() {
+  createShadeCards(shadesData);
+  createLineupCard(lineupProductsData);
+
+  renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    canvas: canvas,
+  });
+  renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
+  renderer.setClearAlpha(0);
+  renderer.setAnimationLoop(animate);
+
+  updateSize();
+  window.addEventListener("resize", updateSize);
+
+  initShadesGsap();
+}
+
+function animate() {
+  renderer.domElement.style.transform = `translateY(${window.scrollY}px)`;
+
+  renderer.setScissorTest(false);
+  renderer.clear();
+  renderer.setScissorTest(true);
+
+  renderViewports(shadeViewports);
+  renderViewports(lineupViewports);
+}
+
+function initShadesGsap() {
+  shadeViewports.forEach(({ scene, element }) => {
+    const card = element.parentElement;
+    const container = card.parentElement;
+
+    const mesh = scene.children[0];
+    gsap.to(mesh.rotation, {
+      z: 3.14,
+      duration: 0.8,
+      scrollTrigger: {
+        trigger: card,
+        horizontal: true,
+        start: "right right",
+        end: "right center",
+        scroller: container,
+        toggleActions: "play play play reverse",
+        // markers: true,
+      },
+    });
+  });
+}
+
+function renderViewports(viewports) {
+  viewports.forEach(function (viewport) {
+    const element = viewport.element;
+    const rect = element.getBoundingClientRect();
+    // check if it's offscreen. If so skip it
+    if (
+      rect.bottom < 0 ||
+      rect.top > renderer.domElement.clientHeight ||
+      rect.right < 0 ||
+      rect.left > renderer.domElement.clientWidth
+    ) {
+      return; // it's off screen
+    }
+    // set the viewport
+    const width = rect.right - rect.left;
+    const height = rect.bottom - rect.top;
+    const left = rect.left;
+    const bottom = renderer.domElement.clientHeight - rect.bottom;
+
+    renderer.setViewport(left, bottom, width, height);
+    renderer.setScissor(left, bottom, width, height);
+    renderer.render(viewport.scene, viewport.camera);
+  });
+}
+
+function updateSize() {
+  const width = canvas.clientWidth;
+  const height = canvas.clientHeight;
+
+  if (canvas.width !== width || canvas.height !== height) {
+    renderer.setSize(width, height, false);
+  }
+
+  shadeViewports.forEach((viewport) => {
+    viewport.camera.aspect =
+      viewport.element.clientWidth / viewport.element.clientHeight;
+    viewport.camera.updateProjectionMatrix();
+  });
+
+  lineupViewports.forEach((viewport) => {
+    viewport.camera.aspect =
+      viewport.element.clientWidth / viewport.element.clientHeight;
+    viewport.camera.updateProjectionMatrix();
+  });
+}
 
 function createShadeCards(shadeCardsData) {
   const sideScrollContainer = document.querySelector("#shadeCardContainer");
@@ -140,9 +281,9 @@ function createShadeCards(shadeCardsData) {
     shadeCard.classList.add("shade-card");
 
     // Create shade-canvas for Three.js scene
-    const shadeCanvas = document.createElement("div");
-    shadeCanvas.classList.add("shade-canvas", "border");
-    shadeCard.appendChild(shadeCanvas);
+    const shadeViewportElement = document.createElement("div");
+    shadeViewportElement.classList.add("shade-canvas", "border");
+    shadeCard.appendChild(shadeViewportElement);
 
     // Create shade-card-title element
     const shadeCardTitle = document.createElement("div");
@@ -159,89 +300,148 @@ function createShadeCards(shadeCardsData) {
     // Append shade-card to the side-scroll container
     sideScrollContainer.appendChild(shadeCard);
 
-    // Initialize Three.js scene for each shadeCanvas
-    initializeThreeScene(
-      shadeCard,
-      sideScrollContainer,
-      shadeCanvas,
-      materialConfig
+    // Initialize Three.js scene for each shadeViewportElement
+    shadeViewports.push(
+      setupShadeViewport(shadeViewportElement, materialConfig)
     );
   });
 }
 
-function initializeThreeScene(container, scroller, canvas, materialConfig) {
-  // Create scene, camera, and renderer
+function setupShadeViewport(element, material) {
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(
-    20,
-    canvas.clientWidth / canvas.clientHeight,
-    0.1,
-    1000
+  const camera = new THREE.PerspectiveCamera(15, 1, 1, 30);
+  camera.position.set(0, 0, 18);
+
+  const mesh = new THREE.Mesh(
+    shadeDiscGeometry,
+    new THREE.MeshStandardMaterial(material)
   );
-  camera.position.z = 10;
+  mesh.rotation.set(1, 0, 1);
+  const hemisphereLight = new THREE.HemisphereLight(0xbbbbbb, 0x666666, 5);
+  const directionalLight = new THREE.DirectionalLight(0xffdbac, 1.5);
+  directionalLight.position.set(-1, 1, 1);
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setSize(canvas.clientWidth, canvas.clientHeight);
-  renderer.setClearColor(0x000000, 0); // Transparent background
-  canvas.appendChild(renderer.domElement);
+  scene.add(mesh);
+  scene.add(hemisphereLight);
+  scene.add(directionalLight);
+  const viewport = {
+    scene: scene,
+    camera: camera,
+    element: element,
+  };
+  return viewport;
+}
 
-  // Create cylinder with provided material configuration
-  // const geometry = new THREE.CylinderGeometry(3, 3, 1, 32);
-  const material = new THREE.MeshPhysicalMaterial(materialConfig);
-  const cylinder = new THREE.Mesh(shadeDiscGeometry, material);
-  cylinder.rotateX(Math.PI / 4);
-  cylinder.rotateZ(Math.PI / 2.5);
-  scene.add(cylinder);
+function setupLineupViewports(element, material) {
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(25, 1, 1, 20);
+  camera.position.set(0, 0, 10);
 
-  // Lighting setup
-  const ambientLight = new THREE.AmbientLight(0xffffff, 2);
-  scene.add(ambientLight);
+  const lineupProduct = compactModel.clone();
+  console.log(lineupProduct);
+  lineupProduct.rotation.set(0.6, 0, 0);
 
-  const lights = [
-    { color: "white", intensity: 1, position: [0.3, 1, 0.2] },
-    { color: "pink", intensity: 0.5, position: [0, -1, 0] },
-    { color: "salmon", intensity: 0.7, position: [1, 0, -1] },
-    { color: "slateblue", intensity: 0.3, position: [-1, -0.5, 0.5] },
-    { color: "white", intensity: 1, position: [-1, 0, 0.5] },
-  ];
+  const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x666666, 5);
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+  directionalLight.position.set(-1, 1, 1);
 
-  lights.forEach(({ color, intensity, position }) => {
-    const light = new THREE.DirectionalLight(color, intensity);
-    light.position.set(...position);
-    scene.add(light);
-  });
+  scene.add(lineupProduct);
+  scene.add(hemisphereLight);
+  scene.add(directionalLight);
+  const viewport = {
+    scene: scene,
+    camera: camera,
+    element: element,
+  };
+  return viewport;
+}
 
-  // Animation loop
-  function animate() {
-    requestAnimationFrame(animate);
-    // cylinder.rotation.x += 0.01;
-    // cylinder.rotation.y += 0.01;
-    renderer.render(scene, camera);
-  }
+function createLineupCard(lineupCardsData) {
+  const lineupContainer = document.querySelector("#lineupCardContainer");
 
-  animate();
+  lineupCardsData.forEach(
+    ({
+      title,
+      skinTypeExpression,
+      recommendedSkinType,
+      moistureLevel,
+      finishLevel,
+      thicknessLevel,
+    }) => {
+      // Create the lineup card container
+      const lineupCard = document.createElement("div");
+      lineupCard.classList.add("lineup-card");
 
-  gsap.to(cylinder.rotation, {
-    z: 3.14,
-    duration: 0.8,
-    ease: "power2.out",
-    scrollTrigger: {
-      trigger: container,
-      horizontal: true,
-      start: "left center",
-      end: "right center",
-      scroller: scroller,
-      toggleActions: "play reverse play reverse",
-      // markers: true,
-    },
-  });
+      // Create the canvas element
+      const lineupCanvas = document.createElement("div");
+      lineupCanvas.classList.add("lineup-canvas");
+      lineupCard.appendChild(lineupCanvas);
 
-  // Handle resizing
-  window.addEventListener("resize", () => {
-    const width = canvas.clientWidth;
-    const height = canvas.clientHeight;
-    renderer.setSize(width, height);
-    camera.aspect = width / height;
-    camera.updateProjectionMatrix();
-  });
+      // Create and set the title
+      const lineupTitle = document.createElement("div");
+      lineupTitle.classList.add("lineup-card-title");
+      lineupTitle.textContent = title;
+      lineupCard.appendChild(lineupTitle);
+
+      // Create the lineup card table container
+      const lineupCardTable = document.createElement("div");
+      lineupCardTable.classList.add("lineup-card-table");
+
+      // Function to add item and content pairs
+      function addItem(itemText, contentText) {
+        const item = document.createElement("div");
+        item.classList.add("lineup-card-item");
+        item.textContent = itemText;
+        lineupCardTable.appendChild(item);
+
+        const content = document.createElement("div");
+        content.classList.add("lineup-card-content");
+        content.textContent = contentText;
+        lineupCardTable.appendChild(content);
+      }
+
+      // Add "피부 표현" and "추천 피부 타입" sections
+      addItem("피부 표현", skinTypeExpression);
+      addItem("추천 피부 타입", recommendedSkinType);
+
+      // Function to add pills based on level
+      function addPillRow(itemText, fillCount) {
+        const item = document.createElement("div");
+        item.classList.add("lineup-card-item");
+        item.textContent = itemText;
+        lineupCardTable.appendChild(item);
+
+        const content = document.createElement("div");
+        content.classList.add("lineup-card-content");
+
+        // Create filled pills
+        for (let i = 0; i < fillCount; i++) {
+          const pill = document.createElement("div");
+          pill.classList.add("pill", "pill-fill");
+          content.appendChild(pill);
+        }
+
+        // Create empty pills (5 total minus filled pills)
+        for (let i = fillCount; i < 5; i++) {
+          const pill = document.createElement("div");
+          pill.classList.add("pill");
+          content.appendChild(pill);
+        }
+
+        lineupCardTable.appendChild(content);
+      }
+
+      // Add "촉촉함," "결정돈," and "두께감" pill sections
+      addPillRow("촉촉함", moistureLevel);
+      addPillRow("결정돈", finishLevel);
+      addPillRow("두께감", thicknessLevel);
+
+      // Append the table to the lineup card
+      lineupCard.appendChild(lineupCardTable);
+
+      lineupContainer.appendChild(lineupCard);
+
+      lineupViewports.push(setupLineupViewports(lineupCanvas));
+    }
+  );
 }
